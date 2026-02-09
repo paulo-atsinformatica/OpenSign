@@ -1,0 +1,83 @@
+# Docker Compose para Coolify
+# Este arquivo constrói as imagens a partir do código do repositório
+# Use este arquivo no Coolify apontando para o repositório GitHub
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/OpenSignServer/Dockerhubfile
+    container_name: OpenSignServer-container
+    volumes:
+      - opensign-files:/usr/src/app/files
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongo
+    env_file: .env.prod
+    environment:
+      - NODE_ENV=production
+      - SERVER_URL=${HOST_URL:-https://localhost:3001}/api/app
+      - PUBLIC_URL=${HOST_URL:-https://localhost:3001}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo-container
+    volumes:
+      - data-volume:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - app-network
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=opensign
+
+  client:
+    build:
+      context: .
+      dockerfile: apps/OpenSign/Dockerhubfile
+    container_name: OpenSign-container
+    depends_on:
+      - server
+    env_file: .env.prod  
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy-container
+    ports:
+      - "3001:3001"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app-network
+    environment:
+      - HOST_URL=${HOST_URL:-localhost:3001}
+    restart: unless-stopped
+    depends_on:
+      - client
+      - server
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  data-volume:
+  web-root:
+  caddy_data:
+  caddy_config:
+  opensign-files:
