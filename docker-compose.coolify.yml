@@ -20,9 +20,20 @@ services:
       - MONGODB_URI=${MONGODB_URI:-${DATABASE_URI}}
       - APP_ID=${APP_ID:-opensign}
       - MASTER_KEY=${MASTER_KEY}
-      - SERVER_URL=${SERVER_URL:-${HOST_URL}/api/app}
+      # URL interna do servidor (sem /api, comunicação interna Docker)
+      - SERVER_URL=${SERVER_URL:-http://server:8080/app}
       - PUBLIC_URL=${PUBLIC_URL:-${HOST_URL}}
       - PARSE_MOUNT=${PARSE_MOUNT:-/app}
+    labels:
+      # Labels Traefik para roteamento da API com prioridade alta
+      - "traefik.enable=true"
+      - "traefik.http.routers.opensign-api.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.opensign-api.priority=20"
+      - "traefik.http.routers.opensign-api.service=opensign-api"
+      - "traefik.http.services.opensign-api.loadbalancer.server.port=8080"
+      # Middleware para remover /api antes de enviar para o servidor
+      - "traefik.http.middlewares.opensign-strip-api.stripPrefix.prefixes=/api"
+      - "traefik.http.routers.opensign-api.middlewares=opensign-strip-api"
       - SMTP_ENABLE=${SMTP_ENABLE:-false}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT:-587}
@@ -67,7 +78,8 @@ services:
     depends_on:
       - server
     environment:
-      - REACT_APP_SERVERURL=${REACT_APP_SERVERURL:-${SERVER_URL:-${HOST_URL}/api/app}}
+      # URL pública da API (com /api, como visto pelo navegador)
+      - REACT_APP_SERVERURL=${REACT_APP_SERVERURL:-${HOST_URL}/api/app}
     expose:
       - "3000"
     networks:
@@ -76,6 +88,11 @@ services:
     labels:
       - "coolify.port=3000"
       - "coolify.expose=true"
+      # Labels Traefik para roteamento do cliente com prioridade baixa
+      - "traefik.enable=true"
+      - "traefik.http.routers.opensign-web.priority=1"
+      - "traefik.http.routers.opensign-web.service=opensign-web"
+      - "traefik.http.services.opensign-web.loadbalancer.server.port=3000"
 
 networks:
   app-network:
