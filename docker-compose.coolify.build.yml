@@ -1,11 +1,12 @@
-# Docker Compose para Coolify
-# Este arquivo usa as imagens do GitHub Container Registry (ghcr.io)
-# As imagens são construídas automaticamente via GitHub Actions
-# Use este arquivo no Coolify apontando para o repositório GitHub
+# Docker Compose para Coolify - Versão com Build Local
+# Use esta versão se quiser construir as imagens localmente no Coolify
+# Alternativa ao docker-compose.coolify.yml que usa imagens do GHCR
 
 services:
   server:
-    image: ghcr.io/paulo-atsinformatica/opensignserver:staging
+    build:
+      context: .
+      dockerfile: apps/OpenSignServer/Dockerhubfile
     container_name: OpenSignServer-container
     volumes:
       - opensign-files:/usr/src/app/files
@@ -36,7 +37,9 @@ services:
       - MONGO_INITDB_DATABASE=opensign
 
   client:
-    image: ghcr.io/paulo-atsinformatica/opensign:staging
+    build:
+      context: .
+      dockerfile: apps/OpenSign/Dockerhubfile
     container_name: OpenSign-container
     depends_on:
       - server
