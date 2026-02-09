@@ -1,10 +1,10 @@
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import fs from 'node:fs/promises';
 import pLimit from 'p-limit';
-import { serverAppId } from '../../../Utils.js';
+import { serverAppId, useLocal } from '../../../Utils.js';
 
 // === Configuration ===
-const serverHost = new URL(process.env.SERVER_URL).hostname;
+const serverHost = process.env.SERVER_URL ? new URL(process.env.SERVER_URL).hostname : 'localhost';
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', serverHost];
 const CONCURRENCY_LIMIT = 5;
 
@@ -26,12 +26,21 @@ function createS3Client({ region, accessKeyId, secretAccessKey, endpoint = null 
   return new S3Client(config);
 }
 
-const s3 = createS3Client({
-  region: process.env.DO_REGION,
-  endpoint: process.env.DO_ENDPOINT,
-  accessKeyId: process.env.DO_ACCESS_KEY_ID,
-  secretAccessKey: process.env.DO_SECRET_ACCESS_KEY,
-});
+// Only create S3 client if not using local storage and credentials are available
+let s3 = null;
+if (useLocal !== 'true' && process.env.DO_REGION && process.env.DO_ACCESS_KEY_ID && process.env.DO_SECRET_ACCESS_KEY) {
+  try {
+    s3 = createS3Client({
+      region: process.env.DO_REGION,
+      endpoint: process.env.DO_ENDPOINT,
+      accessKeyId: process.env.DO_ACCESS_KEY_ID,
+      secretAccessKey: process.env.DO_SECRET_ACCESS_KEY,
+    });
+  } catch (err) {
+    console.warn('⚠️ Failed to create S3 client:', err.message);
+    s3 = null;
+  }
+}
 
 // === Helpers ===
 function getS3ParamsFromUrl(fileUrl) {
@@ -46,6 +55,11 @@ function getS3ParamsFromUrl(fileUrl) {
 }
 
 async function deleteS3File(fileUrl) {
+  if (!s3) {
+    console.warn('⚠️ S3 client not available, skipping S3 delete');
+    return;
+  }
+  
   const params = getS3ParamsFromUrl(fileUrl);
   if (!params) return;
 
