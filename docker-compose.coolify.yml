@@ -1,7 +1,18 @@
 # Docker Compose para Coolify
 # Este arquivo usa as imagens do GitHub Container Registry (ghcr.io)
 # As imagens são construídas automaticamente via GitHub Actions
-# Use este arquivo no Coolify apontando para o repositório GitHub
+#
+# COMO CONFIGURAR NO COOLIFY:
+# 1. Crie um novo recurso "Docker Compose" no Coolify
+# 2. Aponte para este repositório e selecione este arquivo
+# 3. No painel do Coolify, configure o domínio no serviço "client" (porta 3000)
+# 4. Defina as variáveis de ambiente no Coolify:
+#    - HOST_URL = https://seu-dominio.com (sem barra no final)
+#    - MASTER_KEY = sua-chave-secreta
+#    - DATABASE_URI = mongodb://mongo:27017/opensign (ou deixe o padrão)
+#    - Demais variáveis conforme necessidade (SMTP, Storage, etc.)
+# 5. O Coolify gerará automaticamente os labels Traefik para o client
+# 6. O server tem labels custom para rotear /api/* via Traefik
 
 services:
   server:
@@ -16,24 +27,16 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=${PORT:-8080}
-      - DATABASE_URI=${DATABASE_URI}
-      - MONGODB_URI=${MONGODB_URI:-${DATABASE_URI}}
+      - DATABASE_URI=${DATABASE_URI:-mongodb://mongo:27017/opensign}
+      - MONGODB_URI=${MONGODB_URI:-${DATABASE_URI:-mongodb://mongo:27017/opensign}}
       - APP_ID=${APP_ID:-opensign}
       - MASTER_KEY=${MASTER_KEY}
-      # URL interna do servidor (sem /api, comunicação interna Docker)
-      - SERVER_URL=${SERVER_URL:-http://server:8080/app}
+      # URL pública do servidor (usada para links em emails de reset de senha, etc.)
+      # DEVE ser a URL pública com /api/app, NÃO a URL interna do Docker
+      - SERVER_URL=${SERVER_URL:-${HOST_URL}/api/app}
       - PUBLIC_URL=${PUBLIC_URL:-${HOST_URL}}
       - PARSE_MOUNT=${PARSE_MOUNT:-/app}
-    labels:
-      # Labels Traefik para roteamento da API com prioridade alta
-      - "traefik.enable=true"
-      - "traefik.http.routers.opensign-api.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.opensign-api.priority=20"
-      - "traefik.http.routers.opensign-api.service=opensign-api"
-      - "traefik.http.services.opensign-api.loadbalancer.server.port=8080"
-      # Middleware para remover /api antes de enviar para o servidor
-      - "traefik.http.middlewares.opensign-strip-api.stripPrefix.prefixes=/api"
-      - "traefik.http.routers.opensign-api.middlewares=opensign-strip-api"
+      # SMTP
       - SMTP_ENABLE=${SMTP_ENABLE:-false}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT:-587}
@@ -42,9 +45,11 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_SECURE=${SMTP_SECURE:-false}
+      # Mailgun
       - MAILGUN_API_KEY=${MAILGUN_API_KEY}
       - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
       - MAILGUN_SENDER=${MAILGUN_SENDER}
+      # Storage
       - USE_LOCAL=${USE_LOCAL:-true}
       - DO_ENDPOINT=${DO_ENDPOINT}
       - DO_SPACE=${DO_SPACE}
@@ -52,9 +57,25 @@ services:
       - DO_REGION=${DO_REGION}
       - DO_ACCESS_KEY_ID=${DO_ACCESS_KEY_ID}
       - DO_SECRET_ACCESS_KEY=${DO_SECRET_ACCESS_KEY}
+      # Google
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      # Outros
       - FILE_KEY=${FILE_KEY}
+    labels:
+      # Labels Traefik para rotear /api/* para o backend
+      # O Coolify NÃO gera labels para este serviço — apenas para o client
+      # Por isso definimos manualmente aqui
+      - "traefik.enable=true"
+      - "traefik.http.routers.opensign-api.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.opensign-api.entrypoints=http,https"
+      - "traefik.http.routers.opensign-api.priority=20"
+      - "traefik.http.routers.opensign-api.service=opensign-api"
+      - "traefik.http.services.opensign-api.loadbalancer.server.port=8080"
+      # Middleware: remove /api do path antes de enviar ao servidor
+      # Ex: /api/app/functions/... → /app/functions/...
+      - "traefik.http.middlewares.opensign-strip-api.stripPrefix.prefixes=/api"
+      - "traefik.http.routers.opensign-api.middlewares=opensign-strip-api"
     networks:
       - app-network
     restart: unless-stopped
@@ -78,7 +99,7 @@ services:
     depends_on:
       - server
     environment:
-      # URL pública da API (com /api, como visto pelo navegador)
+      # URL pública da API (com /api/app, como visto pelo navegador)
       - REACT_APP_SERVERURL=${REACT_APP_SERVERURL:-${HOST_URL}/api/app}
     expose:
       - "3000"
@@ -86,13 +107,10 @@ services:
       - app-network
     restart: unless-stopped
     labels:
+      # O Coolify usa estas labels para saber qual serviço expor
+      # O domínio e os labels Traefik são gerados automaticamente pelo Coolify
       - "coolify.port=3000"
       - "coolify.expose=true"
-      # Labels Traefik para roteamento do cliente com prioridade baixa
-      - "traefik.enable=true"
-      - "traefik.http.routers.opensign-web.priority=1"
-      - "traefik.http.routers.opensign-web.service=opensign-web"
-      - "traefik.http.services.opensign-web.loadbalancer.server.port=3000"
 
 networks:
   app-network:

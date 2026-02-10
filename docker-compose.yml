@@ -1,62 +1,93 @@
 services:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik-container
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      # Para habilitar HTTPS com Let's Encrypt, descomente as linhas abaixo:
+      # - "--entrypoints.websecure.address=:443"
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      # - "--certificatesresolvers.letsencrypt.acme.email=seu-email@exemplo.com"
+      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      # - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # - letsencrypt:/letsencrypt
+    networks:
+      - app-network
+    restart: unless-stopped
+
   server:
     image: opensign/opensignserver:main
     container_name: OpenSignServer-container
     volumes:
       - opensign-files:/usr/src/app/files
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     depends_on:
       - mongo
     env_file: .env.prod
     environment:
       - NODE_ENV=production
-      - SERVER_URL=${HOST_URL:-https://localhost:3001}/api/app
-      - PUBLIC_URL=${HOST_URL:-https://localhost:3001}
+      - SERVER_URL=${HOST_URL:-http://localhost}/api/app
+      - PUBLIC_URL=${HOST_URL:-http://localhost}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opensign-api.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.opensign-api.entrypoints=web"
+      - "traefik.http.routers.opensign-api.priority=20"
+      - "traefik.http.routers.opensign-api.service=opensign-api"
+      - "traefik.http.services.opensign-api.loadbalancer.server.port=8080"
+      # Middleware para remover /api antes de enviar para o servidor
+      - "traefik.http.middlewares.opensign-strip-api.stripPrefix.prefixes=/api"
+      - "traefik.http.routers.opensign-api.middlewares=opensign-strip-api"
     networks:
       - app-network
+    restart: unless-stopped
+
   mongo:
     image: mongo:latest
     container_name: mongo-container
     volumes:
       - data-volume:/data/db
-    ports:
-      - "27018:27017"
+    expose:
+      - "27017"
     networks:
       - app-network
+    restart: unless-stopped
+
   client:
     image: opensign/opensign:main
     container_name: OpenSign-container
     depends_on:
       - server
-    env_file: .env.prod  
-    ports:
-      - "3000:3000"
-    networks:
-      - app-network
-  caddy:
-    image: caddy:latest
-    container_name: caddy-container
-    ports:
-      - "3001:3001"
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - app-network
+    env_file: .env.prod
     environment:
-      - HOST_URL=${HOST_URL:-localhost:3001}
+      - REACT_APP_SERVERURL=${HOST_URL:-http://localhost}/api/app
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opensign-web.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.opensign-web.entrypoints=web"
+      - "traefik.http.routers.opensign-web.priority=1"
+      - "traefik.http.routers.opensign-web.service=opensign-web"
+      - "traefik.http.services.opensign-web.loadbalancer.server.port=3000"
+    networks:
+      - app-network
+    restart: unless-stopped
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   data-volume:
-  web-root:
-  caddy_data:
-  caddy_config:
   opensign-files:
+  # letsencrypt:

@@ -1,3 +1,7 @@
+# DEPRECADO: Este projeto agora usa Traefik como proxy reverso padrão.
+# Este arquivo é mantido apenas para referência.
+# Veja docker-compose.yml para a configuração com Traefik.
+
 {$HOST_URL} {
     reverse_proxy client:3000
     handle_path /api/* {
