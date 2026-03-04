@@ -1,0 +1,11 @@
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.sign-api.entrypoints: websecure
+      traefik.http.routers.sign-api.rule: Host(`sign.example.com`) && PathPrefix(`/api`)
+      traefik.http.routers.sign-api.tls: "true"
+      traefik.http.routers.sign-api.priority: "20"
+      traefik.http.middlewares.sign-strip-api.stripPrefix.prefixes: /api
+      traefik.http.routers.sign-api.middlewares: sign-strip-api
+      traefik.http.routers.sign-api.service: sign-api
+      traefik.http.services.sign-api.loadbalancer.server.port: 8080

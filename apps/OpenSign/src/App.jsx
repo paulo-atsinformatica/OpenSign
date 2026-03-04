@@ -33,6 +33,7 @@ const UpdateExistUserAdmin = lazyWithRetry(
   () => import("./pages/UpdateExistUserAdmin")
 );
 const Preferences = lazyWithRetry(() => import("./pages/Preferences"));
+const TeamList = lazyWithRetry(() => import("./pages/TeamList"));
 const Login = lazyWithRetry(() => import("./pages/Login"));
 const VerifyDocument = lazyWithRetry(() => import("./pages/VerifyDocument"));
 const EmailBuilder = lazyWithRetry(() => import("./pages/EmailBuilder"));
@@ -91,6 +92,7 @@ function App() {
               />
             <Route element={<HomeLayout />}>
                   <Route path="/users" element={<UserList />} />
+                  <Route path="/teams" element={<Lazy Page={TeamList} />} />
                   <Route
                     path="/changepassword"
                     element={<Lazy Page={ChangePassword} />}

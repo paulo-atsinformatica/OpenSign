@@ -6,6 +6,14 @@ const userssetting = [
     pageType: "",
     description: "",
     objectId: "users"
+  },
+  {
+    icon: "fa-light fa-user-group fa-fw",
+    title: "Teams",
+    target: "_self",
+    pageType: "",
+    description: "",
+    objectId: "teams"
   }
 ];
 export const subSetting = [

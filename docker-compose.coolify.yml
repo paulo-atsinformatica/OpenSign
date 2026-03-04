@@ -1,121 +1,77 @@
-# Docker Compose para Coolify
-# Este arquivo usa as imagens do GitHub Container Registry (ghcr.io)
-# As imagens são construídas automaticamente via GitHub Actions
-#
-# COMO CONFIGURAR NO COOLIFY:
-# 1. Crie um novo recurso "Docker Compose" no Coolify
-# 2. Aponte para este repositório e selecione este arquivo
-# 3. No painel do Coolify, configure o domínio no serviço "client" (porta 3000)
-# 4. Defina as variáveis de ambiente no Coolify:
-#    - HOST_URL = https://seu-dominio.com (sem barra no final)
-#    - MASTER_KEY = sua-chave-secreta
-#    - DATABASE_URI = mongodb://mongo:27017/opensign (ou deixe o padrão)
-#    - Demais variáveis conforme necessidade (SMTP, Storage, etc.)
-# 5. O Coolify gerará automaticamente os labels Traefik para o client
-# 6. O server tem labels custom para rotear /api/* via Traefik
-
 services:
   server:
-    image: ghcr.io/paulo-atsinformatica/opensignserver:staging
+    image: 'ghcr.io/paulo-atsinformatica/opensignserver:staging'
     container_name: OpenSignServer-container
     volumes:
-      - opensign-files:/usr/src/app/files
+      - 'opensign-files:/usr/src/app/files'
     expose:
-      - "8080"
+      - '8080'
     depends_on:
       - mongo
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${PORT:-8080}
-      - DATABASE_URI=${DATABASE_URI:-mongodb://mongo:27017/opensign}
-      - MONGODB_URI=${MONGODB_URI:-${DATABASE_URI:-mongodb://mongo:27017/opensign}}
-      - APP_ID=${APP_ID:-opensign}
-      - MASTER_KEY=${MASTER_KEY}
-      # URL pública do servidor (usada para links em emails de reset de senha, etc.)
-      # DEVE ser a URL pública com /api/app, NÃO a URL interna do Docker
-      - SERVER_URL=${SERVER_URL:-${HOST_URL}/api/app}
-      - PUBLIC_URL=${PUBLIC_URL:-${HOST_URL}}
-      - PARSE_MOUNT=${PARSE_MOUNT:-/app}
-      # SMTP
-      - SMTP_ENABLE=${SMTP_ENABLE:-false}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER_EMAIL=${SMTP_USER_EMAIL}
-      - SMTP_USERNAME=${SMTP_USERNAME}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - SMTP_PASS=${SMTP_PASS}
-      - SMTP_SECURE=${SMTP_SECURE:-false}
-      # Mailgun
-      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
-      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
-      - MAILGUN_SENDER=${MAILGUN_SENDER}
-      # Storage
-      - USE_LOCAL=${USE_LOCAL:-true}
-      - DO_ENDPOINT=${DO_ENDPOINT}
-      - DO_SPACE=${DO_SPACE}
-      - DO_BASEURL=${DO_BASEURL}
-      - DO_REGION=${DO_REGION}
-      - DO_ACCESS_KEY_ID=${DO_ACCESS_KEY_ID}
-      - DO_SECRET_ACCESS_KEY=${DO_SECRET_ACCESS_KEY}
-      # Google
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      # Outros
-      - FILE_KEY=${FILE_KEY}
+      - 'NODE_ENV=${NODE_ENV:-production}'
+      - 'PORT=${PORT:-8080}'
+      - 'DATABASE_URI=${DATABASE_URI:-mongodb://mongo:27017/opensign}'
+      - 'MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/opensign}'
+      - 'APP_ID=${APP_ID:-opensign}'
+      - 'MASTER_KEY=${MASTER_KEY}'
+      - 'SERVER_URL=${SERVER_URL}'
+      - 'PUBLIC_URL=${PUBLIC_URL}'
+      - 'PARSE_MOUNT=${PARSE_MOUNT:-/app}'
     labels:
-      # Labels Traefik para rotear /api/* para o backend
-      # O Coolify NÃO gera labels para este serviço — apenas para o client
-      # Por isso definimos manualmente aqui
-      - "traefik.enable=true"
-      - "traefik.http.routers.opensign-api.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.opensign-api.entrypoints=http,https"
-      - "traefik.http.routers.opensign-api.priority=20"
-      - "traefik.http.routers.opensign-api.service=opensign-api"
-      - "traefik.http.services.opensign-api.loadbalancer.server.port=8080"
-      # Middleware: remove /api do path antes de enviar ao servidor
-      # Ex: /api/app/functions/... → /app/functions/...
-      - "traefik.http.middlewares.opensign-strip-api.stripPrefix.prefixes=/api"
-      - "traefik.http.routers.opensign-api.middlewares=opensign-strip-api"
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - 'traefik.http.routers.opensign-api.rule=Host(`assinatura.atsinformatica.com.br`) && PathPrefix(`/api`)'
+      - traefik.http.routers.opensign-api.entrypoints=http
+      - traefik.http.routers.opensign-api.priority=100
+      - traefik.http.routers.opensign-api.middlewares=opensign-strip-api
+      - 'traefik.http.routers.opensign-api-secure.rule=Host(`assinatura.atsinformatica.com.br`) && PathPrefix(`/api`)'
+      - traefik.http.routers.opensign-api-secure.entrypoints=https
+      - traefik.http.routers.opensign-api-secure.priority=100
+      - traefik.http.routers.opensign-api-secure.tls=true
+      - traefik.http.routers.opensign-api-secure.tls.certresolver=letsencrypt
+      - traefik.http.routers.opensign-api-secure.middlewares=opensign-strip-api
+      - traefik.http.routers.opensign-api-secure.service=opensign-api
+      - traefik.http.services.opensign-api.loadbalancer.server.port=8080
+      - traefik.http.middlewares.opensign-strip-api.stripPrefix.prefixes=/api
     networks:
       - app-network
+      - coolify
     restart: unless-stopped
-
   mongo:
-    image: mongo:latest
+    image: 'mongo:latest'
     container_name: mongo-container
     volumes:
-      - data-volume:/data/db
+      - 'data-volume:/data/db'
     expose:
-      - "27017"
+      - '27017'
     networks:
       - app-network
     restart: unless-stopped
     environment:
       - MONGO_INITDB_DATABASE=opensign
-
   client:
-    image: ghcr.io/paulo-atsinformatica/opensign:staging
+    image: 'ghcr.io/paulo-atsinformatica/opensign:staging'
     container_name: OpenSign-container
     depends_on:
       - server
     environment:
-      # URL pública da API (com /api/app, como visto pelo navegador)
-      - REACT_APP_SERVERURL=${REACT_APP_SERVERURL:-${HOST_URL}/api/app}
+      - 'REACT_APP_SERVERURL=${REACT_APP_SERVERURL}'
     expose:
-      - "3000"
+      - '3060'
     networks:
       - app-network
+      - coolify
     restart: unless-stopped
     labels:
-      # O Coolify usa estas labels para saber qual serviço expor
-      # O domínio e os labels Traefik são gerados automaticamente pelo Coolify
-      - "coolify.port=3000"
-      - "coolify.expose=true"
-
+      - coolify.port=3060
+      - coolify.expose=true
+      - traefik.docker.network=coolify
 networks:
   app-network:
     driver: bridge
-
+  coolify:
+    external: true
 volumes:
-  data-volume:
-  opensign-files:
+  data-volume: null
+  opensign-files: null

@@ -28,4 +28,14 @@ i18n
     whitelist: ["en", "es", "fr", "it", "de", "hi", "kr", "pt-BR"] // List of allowed languages
   });
 
+// Sincroniza o atributo lang do <html> com o idioma do i18n para o navegador
+// reconhecer o idioma (ex.: pt-BR) e não pedir para traduzir a página.
+function setHtmlLang(lng) {
+  if (typeof document !== "undefined" && document.documentElement) {
+    document.documentElement.lang = lng || "en";
+  }
+}
+i18n.on("initialized", () => setHtmlLang(i18n.language));
+i18n.on("languageChanged", setHtmlLang);
+
 export default i18n;

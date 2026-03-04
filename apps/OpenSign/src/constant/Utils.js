@@ -2954,7 +2954,8 @@ export const handleDownloadCertificate = async (
   };
 
   if (initialCertificateUrl) {
-    await downloadCertificate(initialCertificateUrl, isZip);
+    // Para download simples, apenas dispara o save; para ZIP, devolve a URL
+    return await downloadCertificate(initialCertificateUrl, isZip);
   } else {
     setIsDownloading("certificate");
     try {
@@ -2964,8 +2965,9 @@ export const handleDownloadCertificate = async (
       });
       const cert = docDetails?.data?.result?.CertificateUrl;
       if (cert) {
-        await downloadCertificate(cert, isZip);
+        const result = await downloadCertificate(cert, isZip);
         setIsDownloading("");
+        return result || cert;
       } else {
         const generateRes = await axios.post(
           `${baseUrl}/generatecertificate`,
@@ -2975,8 +2977,9 @@ export const handleDownloadCertificate = async (
         const certificate = generateRes?.data?.result?.CertificateUrl;
         if (certificate) {
           try {
-            await downloadCertificate(certificate, isZip, true);
+            const result = await downloadCertificate(certificate, isZip, true);
             setIsDownloading("");
+            return result || certificate;
           } catch (err) {
             console.error("download certificate err", err);
             setIsDownloading("certificate_err");
