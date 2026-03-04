@@ -267,6 +267,38 @@ const AddUser = (props) => {
                             ))}
                         </select>
                       </div>
+                      {teamList.length > 0 && (
+                        <div className="mb-3">
+                          <label
+                            htmlFor="team"
+                            className="block text-xs font-semibold"
+                          >
+                            {t("Team")}
+                            <span className="text-[red] text-[13px]"> *</span>
+                          </label>
+                          <select
+                            id="team"
+                            name="team"
+                            value={formdata.team}
+                            onChange={(e) => handleChange(e)}
+                            className="op-select op-select-bordered op-select-sm focus:outline-none hover:border-base-content w-full text-xs"
+                            onInvalid={(e) =>
+                              e.target.setCustomValidity(t("input-required"))
+                            }
+                            onInput={(e) => e.target.setCustomValidity("")}
+                            required
+                          >
+                            <option value="">
+                              {t("Select")}
+                            </option>
+                            {teamList.map((team) => (
+                              <option key={team.objectId} value={team.objectId}>
+                                {team.Name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="flex items-center mt-3 gap-2 text-white">
                         <button type="submit" className="op-btn op-btn-primary">
                           {t("submit")}

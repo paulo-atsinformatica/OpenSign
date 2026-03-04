@@ -41,6 +41,7 @@ import { RenderReportCell } from "../../primitives/RenderReportCell";
 import CustomizeMail from "../../components/pdf/CustomizeMail";
 import { resetWidgetState } from "../../redux/reducers/widgetSlice";
 import EmailBodyEditor from "../../components/EmailBodyEditor";
+import Select from "react-select";
 
 const isSignExist = (placeholders = []) => {
   const isSignature =
@@ -85,6 +86,7 @@ const TemplatesReport = (props) => {
   const [isLoader, setIsLoader] = useState({});
   const [isShareWith, setIsShareWith] = useState({});
   const [selectedTeam, setSelectedTeam] = useState([]);
+  const [teamOptions, setTeamOptions] = useState([]);
   const [isModal, setIsModal] = useState({});
   const [signatureType, setSignatureType] = useState([]);
   const Extand_Class = localStorage.getItem("Extand_Class");
@@ -196,16 +198,13 @@ const TemplatesReport = (props) => {
       const extUser = JSON.parse(localStorage.getItem("Extand_Class"))?.[0];
       if (extUser?.OrganizationId?.objectId) {
         const teamtRes = await Parse.Cloud.run("getteams", { active: true });
-        if (teamtRes.length > 0) {
+        if (teamtRes && teamtRes.length > 0) {
           const _teamRes = JSON.parse(JSON.stringify(teamtRes));
-            const selected = _teamRes.map(
-              (x) =>
-                x.Name === "All Users" && {
-                  label: x.Name,
-                  value: x.objectId
-                }
-            );
-            setSelectedTeam(selected);
+          const options = _teamRes.map((x) => ({
+            label: x.Name,
+            value: x.objectId
+          }));
+          setTeamOptions(options);
         }
       }
     } catch (err) {
@@ -349,12 +348,13 @@ const TemplatesReport = (props) => {
       handleBulkSend(item);
     } else if (act.action === "sharewithteam") {
       if (item?.SharedWith && item?.SharedWith.length > 0) {
-        // below code is used to get existing sharewith teams and formated them as per react-select
-        const formatedList = item?.SharedWith.map((x) => ({
+        const formatedList = item.SharedWith.map((x) => ({
           label: x.Name,
           value: x.objectId
         }));
         setSelectedTeam(formatedList);
+      } else {
+        setSelectedTeam([]);
       }
       setIsShareWith({ [item.objectId]: true });
     }
@@ -1317,14 +1317,27 @@ const TemplatesReport = (props) => {
                                   >
                                     ✕
                                   </div>
-                                  <div className="px-2 mt-3 w-full h-full">
-                                    <div className="op-input op-input-bordered op-input-sm w-full h-full text-[13px] break-all">
-                                      {selectedTeam?.[0]?.label}
-                                    </div>
+                                  <div className="px-4 pt-2 pb-4">
+                                    <label className="block text-sm font-semibold text-base-content mb-2">
+                                      {t("sidebar.Settings-Children.Teams")}
+                                    </label>
+                                    <Select
+                                      isMulti
+                                      options={teamOptions}
+                                      value={selectedTeam}
+                                      onChange={setSelectedTeam}
+                                      placeholder={t("Select") + "..."}
+                                      className="react-select-container text-base-content"
+                                      classNamePrefix="react-select"
+                                      noOptionsMessage={() => t("no-data-available")}
+                                    />
+                                    <p className="text-xs text-base-content/70 mt-2">
+                                      {t("users-from-teams")}
+                                    </p>
                                   </div>
                                   <button
                                     onClick={(e) => handleShareWith(e, item)}
-                                    className="op-btn op-btn-primary ml-[10px] my-3"
+                                    className="op-btn op-btn-primary ml-4 mb-4"
                                   >
                                     {t("submit")}
                                   </button>
